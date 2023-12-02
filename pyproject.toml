@@ -4,7 +4,7 @@ authors = [
 ]
 dependencies = [
   "click>=8.0.0",
-  "pymongo>=4.6.1",
+  "pymongo[srv]>=4.6.1",
   "gradio>=4.7.1",
   "python-dotenv>=1.0.0",
   "loguru>=0.7.0",
