@@ -22,4 +22,7 @@ COPY --chown=user . $HOME/app
 # Install dependencies
 RUN pip3 install -e .
 
+EXPOSE 7860
+ENV GRADIO_SERVER_PORT=7860
+
 CMD python fish_data_engine/ui.py
