@@ -5,28 +5,21 @@ from loguru import logger
 from hashlib import sha384
 from uuid import uuid4
 import pymongo
+import boto3
+from pathlib import Path
 
 load_dotenv()
 
 DB_SESSION = None
-# class User(Document):
-#     name = StringField(required=True, unique=True, index=True)
-#     password = StringField(required=True)
-#     created_at = StringField(required=True)
-
-#     meta = {'collection': 'users'}
-
-
-# class Sample(Document):
-#     id = StringField(required=True, unique=True, index=True)
-#     sample_type = StringField(required=True, index=True)
-#     s3_url = StringField(required=True)
-#     annotation = DictField()
-#     annotator = StringField(index=True, sparse=True)
-#     created_at = StringField(required=True, index=True)
-#     updated_at = StringField(required=True, index=True)
-
-#     meta = {'collection': 'samples'}
+BOTO_SESSION = boto3.session.Session()
+S3_CLIENT = BOTO_SESSION.client(
+    service_name="s3",
+    aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+    aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+    endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+)
+S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
+S3_PREFIX = os.getenv("S3_PREFIX")
 
 
 def init_database():
@@ -36,7 +29,6 @@ def init_database():
     db = client.get_database()
 
     db.users.create_index([("name", pymongo.ASCENDING)], unique=True)
-    db.samples.create_index([("id", pymongo.ASCENDING)], unique=True)
 
     db.samples.create_index([("sample_type", pymongo.ASCENDING)])
     db.samples.create_index([("annotator", pymongo.ASCENDING)])
@@ -72,11 +64,16 @@ def remove_user(name):
     return DB_SESSION.users.delete_one({"name": name})
 
 
-def create_sample(sample_type, s3_url):
+def create_sample(sample_type, path):
+    name = str(uuid4())
+    suffix = Path(path).suffix
+    file_path = f"{S3_PREFIX}/{name}{suffix}"
+    S3_CLIENT.upload_file(path, S3_BUCKET_NAME, file_path)
+
     sample = {
-        "_id": str(uuid4()),
+        "_id": name,
         "sample_type": sample_type,
-        "s3_url": s3_url,
+        "s3_path": file_path,
         "created_at": datetime.utcnow(),
         "updated_at": datetime.utcnow(),
         "annotation": None,
@@ -103,8 +100,8 @@ def update_sample(sample_id, annotation, annotator):
     )
 
 
-def get_new_sample(sample_type):
-    return DB_SESSION.samples.find_one_and_update(
+def get_new_sample(sample_type, uid):
+    sample = DB_SESSION.samples.find_one_and_update(
         {
             "$or": [
                 {"status": "pending", "sample_type": sample_type},
@@ -122,3 +119,20 @@ def get_new_sample(sample_type):
             }
         },
     )
+
+    if sample is None:
+        return None
+
+    suffix = Path(sample["s3_path"]).suffix
+    data = S3_CLIENT.get_object(
+        Bucket=S3_BUCKET_NAME,
+        Key=sample["s3_path"],
+    )["Body"].read()
+
+    tmp_path = Path("tmp") / f"{uid}{suffix}"
+    tmp_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path.write_bytes(data)
+
+    sample["data"] = tmp_path
+
+    return sample

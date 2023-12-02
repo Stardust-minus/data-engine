@@ -8,6 +8,7 @@ dependencies = [
   "gradio>=4.7.1",
   "python-dotenv>=1.0.0",
   "loguru>=0.7.0",
+  "librosa>=0.10.1"
 ]
 description = "Annotate Audio Data"
 license = {text = "Apache"}
@@ -22,3 +23,6 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 packages = ["fish_data_engine"]
+
+[tool.ruff]
+line-length = 120
