@@ -1,4 +1,4 @@
-FROM python:latest
+FROM python:3.10-slim-bookworm
 
 # Set up a new user named "user" with user ID 1000
 RUN useradd -m -u 1000 user
