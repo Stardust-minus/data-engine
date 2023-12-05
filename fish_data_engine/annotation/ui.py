@@ -1,4 +1,4 @@
-from fish_data_engine.api import (
+from fish_data_engine.annotation.api import (
     init_database,
     login_user,
     get_new_sample,
