@@ -6,7 +6,7 @@ from fish_data_engine.utils.file import list_files, AUDIO_EXTENSIONS
 import click
 from random import Random, choices
 import soundfile as sf
-from fish_data_engine.annotation.api import create_sample
+from fish_data_engine.annotation.api import create_sample, init_database
 from tempfile import NamedTemporaryFile
 
 
@@ -21,6 +21,7 @@ class GenerateSegments(Task):
                 segmentation="pyannote/segmentation",
             )
             self.pipeline.to(torch.device("cuda"))
+            init_database()
 
     def jobs(self) -> list:
         files = list_files(self.input_dir, AUDIO_EXTENSIONS, recursive=True, sort=True)

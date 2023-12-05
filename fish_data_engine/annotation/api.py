@@ -25,6 +25,11 @@ S3_PREFIX = os.getenv("S3_PREFIX")
 def init_database():
     global DB_SESSION
 
+    import dns.resolver
+
+    dns.resolver.default_resolver = dns.resolver.Resolver(configure=False)
+    dns.resolver.default_resolver.nameservers = ["8.8.8.8"]
+
     client = pymongo.MongoClient(host=os.getenv("MONGODB_URI"))
     db = client.get_database()
 
@@ -101,16 +106,34 @@ def update_sample(sample_id, annotation, annotator):
 
 
 def get_new_sample(sample_type, uid):
-    sample = DB_SESSION.samples.find_one_and_update(
+    sample = DB_SESSION.samples.aggregate(
+        [
+            {
+                "$match": {
+                    "$or": [
+                        {"status": "pending", "sample_type": sample_type},
+                        {
+                            "status": "annotating",
+                            "sample_type": sample_type,
+                            "updated_at": {
+                                "$lt": datetime.utcnow() - timedelta(minutes=10)
+                            },
+                        },
+                    ],
+                }
+            },
+            {"$sample": {"size": 1}},
+        ]
+    )
+
+    if sample is None:
+        return None
+
+    sample = list(sample)[0]
+
+    DB_SESSION.samples.find_one_and_update(
         {
-            "$or": [
-                {"status": "pending", "sample_type": sample_type},
-                {
-                    "status": "annotating",
-                    "sample_type": sample_type,
-                    "updated_at": {"$lt": datetime.utcnow() - timedelta(minutes=10)},
-                },
-            ],
+            "_id": sample["_id"],
         },
         {
             "$set": {

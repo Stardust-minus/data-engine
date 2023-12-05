@@ -16,7 +16,7 @@ description = "Annotate Audio Data"
 license = {text = "Apache"}
 name = "fish-data-engine"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.9"
 version = "0.1.0"
 
 [build-system]
