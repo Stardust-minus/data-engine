@@ -159,3 +159,12 @@ def get_new_sample(sample_type, uid):
     sample["data"] = tmp_path
 
     return sample
+
+
+def count_samples(sample_type):
+    return {
+        "total": DB_SESSION.samples.count_documents({"sample_type": sample_type}),
+        "annotated": DB_SESSION.samples.count_documents(
+            {"sample_type": sample_type, "status": "annotated"}
+        ),
+    }

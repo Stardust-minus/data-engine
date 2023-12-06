@@ -1,4 +1,5 @@
 from fish_data_engine.annotation.api import (
+    count_samples,
     init_database,
     login_user,
     get_new_sample,
@@ -57,7 +58,10 @@ def call_submit_sample(username, password, sample, audio, clear, checkboxs):
     if sample is None:
         return "所有样本已标注完毕", None, None
 
-    return "已获取样本", sample, sample["data"]
+    # 计算剩余样本数和总样本数
+    samples = count_samples("audio-quality")
+
+    return f"已获取样本 {samples['annotated']}/{samples['total']}", sample, sample["data"]
 
 
 def login_panel():
@@ -72,7 +76,7 @@ def login_panel():
 
 def annotation_panel(username, password):
     with gr.Column(scale=9):
-        audio = gr.Audio(label="音频", type="filepath")
+        audio = gr.Audio(label="音频", type="filepath", autoplay=True)
 
         with gr.Row():
             with gr.Column(scale=2):
