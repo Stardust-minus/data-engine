@@ -92,10 +92,18 @@ class Task:
             counter[status] += 1
 
             if time.time() - log_time > 10:
-                eta = (time.time() - start_time) / (idx + 1) * (len(jobs) - idx - 1)
+                eta_seconds = (
+                    (time.time() - start_time) / (idx + 1) * (len(jobs) - idx - 1)
+                )
+                # Convert seconds to days, hours, minutes
+                eta_days = eta_seconds // (24 * 3600)
+                eta_hours = (eta_seconds % (24 * 3600)) // 3600
+                eta_minutes = (eta_seconds % 3600) // 60
+                eta_str = f"{eta_days:.0f}d {eta_hours:.0f}h {eta_minutes:.0f}m"
+
                 status_str = ", ".join([f"{k}: {v}" for k, v in counter.items()])
                 logger.info(
-                    f"{CURR_WORKER} Processed {jobs.index(job)}/{len(jobs)} jobs, ETA: {eta:.2f}s -> {status_str}"
+                    f"{CURR_WORKER} Processed {jobs.index(job)}/{len(jobs)} jobs, ETA: {eta_str} -> {status_str}"
                 )
                 log_time = time.time()
 

@@ -78,13 +78,6 @@ class ASR(Task):
 
     @torch.no_grad()
     def process(self, job):
-        # Always clear GPU cache before processing a new job
-        torch.cuda.empty_cache()
-
-        audio, sr = torchaudio.load(job)
-        logger.debug(f"Audio loaded, duration={audio.shape[1]/sr:.1f}s")
-        audio = audio.cuda()
-
         relative_path = job.relative_to(self.input_dir)
         output_path = self.output_dir / relative_path.parent / relative_path.stem
         output_path.mkdir(parents=True, exist_ok=True)
@@ -92,6 +85,13 @@ class ASR(Task):
         if (output_path / "asr.json").exists():
             logger.debug(f"ASR already done for {relative_path}")
             return
+
+        # Always clear GPU cache before processing a new job
+        torch.cuda.empty_cache()
+
+        audio, sr = torchaudio.load(job)
+        logger.debug(f"Audio loaded, duration={audio.shape[1]/sr:.1f}s")
+        audio = audio.cuda()
 
         # To mono
         if audio.shape[0] > 1:
@@ -160,8 +160,8 @@ class ASR(Task):
             )["sentences"]
             asr_result = [
                 {
-                    "start": s["start"] / sr,
-                    "end": s["end"] / sr,
+                    "start": s["start"] / 1000,
+                    "end": s["end"] / 1000,
                     "text": s["text"],
                 }
                 for s in sentences
