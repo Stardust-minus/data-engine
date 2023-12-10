@@ -239,7 +239,7 @@ class ASR(Task):
         logger.debug(f"VAD model applied, found {len(speaker_to_turns)} speakers")
 
         # Calculate the total length of the audio in seconds
-        audio.shape[-1] / sr
+        total_length = audio.shape[-1] / sr
 
         # Initialize a new dictionary for filtered speaker turns
         filtered_speaker_to_turns = {}
@@ -247,8 +247,8 @@ class ASR(Task):
         for speaker, turns in speaker_to_turns.items():
             total_speaking_time = sum(end - start for start, end in turns)
 
-            # Check if total speaking time is more than 60s and more than 10% of the audio length
-            if total_speaking_time > 60:
+            # Check if total speaking time is more than 60s and more than 20% of the audio length
+            if total_speaking_time > 60 and total_speaking_time > total_length * 0.2:
                 filtered_speaker_to_turns[speaker] = turns
 
         # Output the filtered speaker turns
