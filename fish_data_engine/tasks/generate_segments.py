@@ -1,7 +1,7 @@
 import librosa
 import torch
 from pyannote.audio.pipelines import VoiceActivityDetection
-from fish_data_engine.task import Task, IS_WORKER
+from fish_data_engine.tasks.task import Task, IS_WORKER
 from fish_data_engine.utils.file import list_files, AUDIO_EXTENSIONS
 import click
 from random import Random, choices
