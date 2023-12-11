@@ -34,7 +34,7 @@ class ASR(Task):
             logger.debug("Loading demucs model")
             self.demucs_model = get_demucs_model("htdemucs")
             self.demucs_model.eval()
-            self.demucs_model.cuda()
+            self.demucs_model.cpu()
             logger.debug("Demucs model loaded")
 
         # Voice activity detection
@@ -43,7 +43,7 @@ class ASR(Task):
             self.speaker_separation_pipeline = PyannotePipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
             )
-            self.speaker_separation_pipeline.to(torch.device("cuda"))
+            self.speaker_separation_pipeline.to(torch.device("cpu"))
             logger.debug("Speaker separation model loaded")
 
         # ASR
@@ -93,13 +93,19 @@ class ASR(Task):
         logger.debug(f"Audio loaded, duration={audio.shape[1]/sr:.1f}s")
         audio = audio.cuda()
 
+        if audio.shape[1] > 6000 * sr:
+            logger.warning("Audio too long, cut to 6000s")
+            audio = audio[:, : 6000 * sr]
+
         # To mono
         if audio.shape[0] > 1:
             audio = audio.mean(0, keepdim=True)
 
         # Extract vocals
         if self.demucs_model:
+            self.demucs_model.to(torch.device("cuda"))
             audio, sr = self.apply_demucs(audio, sr)
+            self.demucs_model.to(torch.device("cpu"))
             torch.cuda.empty_cache()
 
         # Sample to 16kHz
@@ -112,7 +118,10 @@ class ASR(Task):
         if not self.speaker_separation_pipeline:
             segments = [[(0, audio.shape[-1] / sr)]]
         else:
+            self.speaker_separation_pipeline.to(torch.device("cuda"))
             segments = self.apply_speaker_separation(audio, sr)
+            self.speaker_separation_pipeline.to(torch.device("cpu"))
+            torch.cuda.empty_cache()
 
             with open(output_path / "vad.json", "w") as f:
                 json.dump(segments, f)
