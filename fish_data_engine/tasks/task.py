@@ -30,6 +30,22 @@ class Task:
         # This will be executed in the worker processes
         raise NotImplementedError
 
+    def fire_child(self, rank, job_pickle):
+        env = deepcopy(os.environ)
+
+        # Respect CUDA_VISIBLE_DEVICES
+        if "CUDA_VISIBLE_DEVICES" in env:
+            devices = env["CUDA_VISIBLE_DEVICES"].split(",")
+            env["CUDA_VISIBLE_DEVICES"] = devices[rank % len(devices)]
+        elif self.USE_CUDA:
+            env["CUDA_VISIBLE_DEVICES"] = str(rank % torch.cuda.device_count())
+
+        # Launch child process
+        env["RANK"] = str(rank)
+        env["JOB_PICKLE"] = job_pickle
+        env["WORLD_SIZE"] = str(WORLD_SIZE)
+        return sp.Popen([sys.executable] + sys.argv, env=env)
+
     def launch_child_processes(self):
         # Main process
         logger.info(f"{CURR_WORKER} Running in main process")
@@ -40,14 +56,6 @@ class Task:
         with TemporaryDirectory() as tmpdir:
             for rank in range(WORLD_SIZE):
                 subset = jobs[rank::WORLD_SIZE]
-                env = deepcopy(os.environ)
-
-                # Respect CUDA_VISIBLE_DEVICES
-                if "CUDA_VISIBLE_DEVICES" in env:
-                    devices = env["CUDA_VISIBLE_DEVICES"].split(",")
-                    env["CUDA_VISIBLE_DEVICES"] = devices[rank % len(devices)]
-                elif self.USE_CUDA:
-                    env["CUDA_VISIBLE_DEVICES"] = str(rank % torch.cuda.device_count())
 
                 # Dump jobs to pickle file
                 job_pickle = os.path.join(tmpdir, f"jobs_{rank}.pkl")
@@ -56,21 +64,29 @@ class Task:
                     pickle.dump(subset, f)
 
                 # Launch child process
-                env["RANK"] = str(rank)
-                env["JOB_PICKLE"] = job_pickle
-                env["WORLD_SIZE"] = str(WORLD_SIZE)
-                processes.append(sp.Popen([sys.executable] + sys.argv, env=env))
+                p = self.fire_child(rank, job_pickle)
+                processes.append(p)
                 logger.info(f"{CURR_WORKER} Launched child process {rank}")
 
             # Wait for all child processes to finish
-            for idx, p in enumerate(processes):
-                p.wait()
+            while len(processes) > 0:
+                removed = [False] * len(processes)
+                for idx, p in enumerate(processes):
+                    if p.poll() is None:
+                        continue
 
-                if p.returncode != 0:
-                    logger.error(
-                        f"{CURR_WORKER} Worker {idx} failed with code {p.returncode}, exiting..."
-                    )
-                    exit(p.returncode)
+                    if p.returncode != 0:
+                        logger.error(
+                            f"{CURR_WORKER} Worker {idx} failed with code {p.returncode}, relaunching"
+                        )
+                        p = self.fire_child(idx, job_pickle)
+                        processes[idx] = p
+                        logger.info(f"{CURR_WORKER} Launched child process {idx}")
+                    else:
+                        logger.info(f"{CURR_WORKER} Worker {idx} finished successfully")
+                        removed[idx] = True
+
+                processes = [p for idx, p in enumerate(processes) if not removed[idx]]
 
         logger.info(f"{CURR_WORKER} All child processes finished successfully")
 

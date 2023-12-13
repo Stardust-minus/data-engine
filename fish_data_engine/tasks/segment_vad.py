@@ -9,16 +9,12 @@ from demucs.pretrained import get_model as get_demucs_model
 import torchaudio
 from loguru import logger
 from pyannote.audio import Pipeline as PyannotePipeline
-from modelscope.pipelines import pipeline as modelscope_pipeline
-from modelscope.utils.constant import Tasks as ModelscopeTasks
 import json
 import sys
 
 
-class ASR(Task):
-    def __init__(
-        self, input_dir, output_dir, demucs, speaker_separation, language, punctuation
-    ):
+class SegmentVAD(Task):
+    def __init__(self, input_dir, output_dir, demucs, speaker_separation):
         super().__init__()
 
         self.input_dir = input_dir
@@ -46,31 +42,6 @@ class ASR(Task):
             self.speaker_separation_pipeline.to(torch.device("cpu"))
             logger.debug("Speaker separation model loaded")
 
-        # ASR
-        assert language in [
-            "zh",
-            "en",
-        ], "Language must be either zh or en, whisper is not supported yet"
-
-        MODELS = {
-            "zh": "damo/speech_paraformer-large-vad-punc_asr_nat-zh-cn-16k-common-vocab8404-pytorch",
-            "en": "damo/speech_paraformer-large-vad-punc_asr_nat-en-16k-common-vocab10020",
-        }
-
-        kwargs = {
-            "model": MODELS[language],
-        }
-
-        if punctuation is False:
-            kwargs["punc_model"] = ""
-
-        logger.debug("Loading ASR model")
-        self.asr_pipeline = modelscope_pipeline(
-            task=ModelscopeTasks.auto_speech_recognition,
-            **kwargs,
-        )
-        logger.debug("ASR model loaded")
-
     def jobs(self) -> list:
         files = list_files(self.input_dir, AUDIO_EXTENSIONS, recursive=True, sort=True)
         Random(42).shuffle(files)
@@ -82,20 +53,16 @@ class ASR(Task):
         output_path = self.output_dir / relative_path.parent / relative_path.stem
         output_path.mkdir(parents=True, exist_ok=True)
 
-        if (output_path / "asr.json").exists():
-            logger.debug(f"ASR already done for {relative_path}")
+        if (output_path / "segment-vad.done").exists():
+            logger.debug(f"Chunk already done for {relative_path}")
             return
 
         # Always clear GPU cache before processing a new job
         torch.cuda.empty_cache()
 
         audio, sr = torchaudio.load(job)
-        logger.debug(f"Audio loaded, duration={audio.shape[1]/sr:.1f}s")
+        logger.debug(f"Audio loaded: {job}, duration={audio.shape[1]/sr:.1f}s")
         audio = audio.cuda()
-
-        if audio.shape[1] > 6000 * sr:
-            logger.warning("Audio too long, cut to 6000s")
-            audio = audio[:, : 6000 * sr]
 
         # To mono
         if audio.shape[0] > 1:
@@ -128,6 +95,7 @@ class ASR(Task):
 
         if len(segments) == 0:
             logger.debug("No speaker found")
+            (output_path / "segment-vad.done").touch()
             return
 
         # Build speaker segments mask on CPU
@@ -147,40 +115,22 @@ class ASR(Task):
         speaker_segments_masks[:, overlapping_segments_mask] = 0
         logger.debug(f"Removed {overlapping_segments_mask.sum()} overlapping segments")
 
-        # ASR
-        logger.debug("Start ASR")
-        asr_results = []
-
         for spk_id, mask in enumerate(speaker_segments_masks):
-            if mask.sum() == 0:
+            if mask.sum() <= sr * 10:
                 continue
 
-            coped_audio = audio.clone()
-            coped_audio[:, mask == 0] = 0
+            coped_audio = audio[:, mask.bool()]
+            logger.debug(
+                f"Save speaker {spk_id}, duration={coped_audio.shape[1]/sr:.1f}s"
+            )
 
             # Save the audio
             sf.write(
                 output_path / f"speaker-{spk_id}.mp3", coped_audio[0].cpu().numpy(), sr
             )
 
-            # ASR
-            sentences = self.asr_pipeline(
-                audio_in=coped_audio[0].cpu().numpy(), sample_rate=sr
-            )["sentences"]
-            asr_result = [
-                {
-                    "start": s["start"] / 1000,
-                    "end": s["end"] / 1000,
-                    "text": s["text"],
-                }
-                for s in sentences
-            ]
-
-            asr_results.append(asr_result)
-
-        logger.debug("ASR done")
-        with open(output_path / "asr.json", "w") as f:
-            json.dump(asr_results, f, ensure_ascii=False)
+        logger.debug("Segment done")
+        (output_path / "segment-vad.done").touch()
 
     def apply_demucs(self, audio, sr):
         logger.debug("Apply demucs model")
@@ -273,17 +223,13 @@ class ASR(Task):
 @click.option("--output-dir", type=str, required=True)
 @click.option("--demucs/--no-demucs", default=True)
 @click.option("--speaker-separation/--no-speaker-separation", default=True)
-@click.option("--punctuation/--no-punctuation", default=True)
-@click.option("--language", type=str, default="zh")
 @click.option("--debug/--no-debug", default=False)
-def main(
-    input_dir, output_dir, demucs, speaker_separation, language, punctuation, debug
-):
+def main(input_dir, output_dir, demucs, speaker_separation, debug):
     if debug:
         logger.remove()
         logger.add(sys.stderr, level="DEBUG")
 
-    task = ASR(input_dir, output_dir, demucs, speaker_separation, language, punctuation)
+    task = SegmentVAD(input_dir, output_dir, demucs, speaker_separation)
     task.run()
 
 
