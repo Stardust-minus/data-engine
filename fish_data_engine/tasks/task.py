@@ -69,8 +69,7 @@ class Task:
                 logger.info(f"{CURR_WORKER} Launched child process {rank}")
 
             # Wait for all child processes to finish
-            while len(processes) > 0:
-                removed = [False] * len(processes)
+            while any([p is not True for p in processes]):
                 for idx, p in enumerate(processes):
                     if p.poll() is None:
                         continue
@@ -84,9 +83,7 @@ class Task:
                         logger.info(f"{CURR_WORKER} Launched child process {idx}")
                     else:
                         logger.info(f"{CURR_WORKER} Worker {idx} finished successfully")
-                        removed[idx] = True
-
-                processes = [p for idx, p in enumerate(processes) if not removed[idx]]
+                        processes[idx] = True
 
         logger.info(f"{CURR_WORKER} All child processes finished successfully")
 

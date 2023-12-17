@@ -30,7 +30,7 @@ class SegmentVAD(Task):
             logger.debug("Loading demucs model")
             self.demucs_model = get_demucs_model("htdemucs")
             self.demucs_model.eval()
-            self.demucs_model.cpu()
+            self.demucs_model.cuda()
             logger.debug("Demucs model loaded")
 
         # Voice activity detection
@@ -39,7 +39,7 @@ class SegmentVAD(Task):
             self.speaker_separation_pipeline = PyannotePipeline.from_pretrained(
                 "pyannote/speaker-diarization-3.1",
             )
-            self.speaker_separation_pipeline.to(torch.device("cpu"))
+            self.speaker_separation_pipeline.to(torch.device("cuda"))
             logger.debug("Speaker separation model loaded")
 
     def jobs(self) -> list:
@@ -64,15 +64,17 @@ class SegmentVAD(Task):
         logger.debug(f"Audio loaded: {job}, duration={audio.shape[1]/sr:.1f}s")
         audio = audio.cuda()
 
+        # If > 5000 hours, split
+        if audio.shape[1] > 5000 * sr:
+            audio = audio[:, : 5000 * sr]
+
         # To mono
         if audio.shape[0] > 1:
             audio = audio.mean(0, keepdim=True)
 
         # Extract vocals
         if self.demucs_model:
-            self.demucs_model.to(torch.device("cuda"))
             audio, sr = self.apply_demucs(audio, sr)
-            self.demucs_model.to(torch.device("cpu"))
             torch.cuda.empty_cache()
 
         # Sample to 16kHz
@@ -85,9 +87,7 @@ class SegmentVAD(Task):
         if not self.speaker_separation_pipeline:
             segments = [[(0, audio.shape[-1] / sr)]]
         else:
-            self.speaker_separation_pipeline.to(torch.device("cuda"))
             segments = self.apply_speaker_separation(audio, sr)
-            self.speaker_separation_pipeline.to(torch.device("cpu"))
             torch.cuda.empty_cache()
 
             with open(output_path / "vad.json", "w") as f:
