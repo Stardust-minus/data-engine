@@ -71,7 +71,7 @@ class Task:
             # Wait for all child processes to finish
             while any([p is not True for p in processes]):
                 for idx, p in enumerate(processes):
-                    if p.poll() is None:
+                    if p is True or p.poll() is None:
                         continue
 
                     if p.returncode != 0:

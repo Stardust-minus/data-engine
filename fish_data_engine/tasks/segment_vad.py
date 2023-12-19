@@ -68,6 +68,8 @@ class SegmentVAD(Task):
         if audio.shape[1] > 5000 * sr:
             audio = audio[:, : 5000 * sr]
 
+        raw_audio, raw_sr = audio.clone(), sr
+
         # To mono
         if audio.shape[0] > 1:
             audio = audio.mean(0, keepdim=True)
@@ -100,14 +102,14 @@ class SegmentVAD(Task):
 
         # Build speaker segments mask on CPU
         speaker_segments_masks = torch.zeros(
-            (len(segments), audio.shape[-1]), dtype=torch.int
+            (len(segments), raw_audio.shape[-1]), dtype=torch.int
         )
         for i, turns in enumerate(segments):
             for start, end in turns:
                 if start >= end:
                     continue
 
-                speaker_segments_masks[i, int(start * sr) : int(end * sr)] = 1
+                speaker_segments_masks[i, int(start * raw_sr) : int(end * raw_sr)] = 1
 
         # Calculate overlapping and remove overlapping segments
         summed_speaker_segments_masks = speaker_segments_masks.sum(0)
@@ -119,14 +121,17 @@ class SegmentVAD(Task):
             if mask.sum() <= sr * 10:
                 continue
 
-            coped_audio = audio[:, mask.bool()]
+            copied_audio = raw_audio[:, mask.bool()]
             logger.debug(
-                f"Save speaker {spk_id}, duration={coped_audio.shape[1]/sr:.1f}s"
+                f"Save speaker {spk_id}, duration={copied_audio.shape[1]/sr:.1f}s"
             )
 
             # Save the audio
+            # Flac is good for intermediate storage
             sf.write(
-                output_path / f"speaker-{spk_id}.mp3", coped_audio[0].cpu().numpy(), sr
+                output_path / f"speaker-{spk_id}.flac",
+                copied_audio[0].cpu().numpy(),
+                raw_sr,
             )
 
         logger.debug("Segment done")
