@@ -18,7 +18,7 @@ huggingface-cli download fishaudio/playerfm audios/${SHARD_PREFIX}/${LANGUAGE}/$
 mkdir -p ${WORK_DIR}/audios
 
 echo "Extracting shard ${SHARD}"
-tar -xvf ${WORK_DIR}/tars/${SHARD}.tar -C ${WORK_DIR}/audios/
+tar -xf ${WORK_DIR}/tars/${SHARD}.tar -C ${WORK_DIR}/audios/
 rm -rf ${WORK_DIR}/tars
 
 echo "Running VAD on shard ${SHARD}"
@@ -30,7 +30,7 @@ python fish_data_engine/tasks/asr.py --input-dir ${WORK_DIR}/vads/ --output-dir 
 rm -rf ${WORK_DIR}/vads
 
 echo "Build tarball for shard ${SHARD}"
-tar -cvf ${WORK_DIR}/upload.tar -C ${WORK_DIR}/results/
+tar -cf ${WORK_DIR}/upload.tar -C ${WORK_DIR}/results/ .
 
 echo "Uploading shard ${SHARD}"
 huggingface-cli upload fishaudio/playerfm ${WORK_DIR}/upload.tar asr/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar
