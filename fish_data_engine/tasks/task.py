@@ -98,7 +98,12 @@ class Task:
         counter = Counter()
 
         for idx, job in enumerate(jobs):
-            status = self.process(job)
+            try:
+                status = self.process(job)
+            except Exception as e:
+                logger.error(f"{CURR_WORKER} Error processing job {job}: {e}")
+                status = "error"
+
             if status is None:
                 status = "success"
 
