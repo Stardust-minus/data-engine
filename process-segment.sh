@@ -14,7 +14,6 @@ rm -rf ${WORK_DIR}
 echo "Downloading shard ${SHARD}"
 mkdir -p ${WORK_DIR}/tars
 huggingface-cli download fishaudio/playerfm audios/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --local-dir ${WORK_DIR}/tars/ --repo-type dataset
-# cp /mnt/nas-hdd/datasets/playerfm/audios/${LANGUAGE}/${SHARD}.tar ${WORK_DIR}/tars
 mkdir -p ${WORK_DIR}/audios
 
 echo "Extracting shard ${SHARD}"
