@@ -18,7 +18,7 @@ huggingface-cli download fishaudio/playerfm audios/${SHARD_PREFIX}/${LANGUAGE}/$
 mkdir -p ${WORK_DIR}/audios
 
 echo "Extracting shard ${SHARD}"
-tar -xf ${WORK_DIR}/tars/${SHARD}.tar -C ${WORK_DIR}/audios/
+tar -xf ${WORK_DIR}/tars/audios/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar -C ${WORK_DIR}/audios/
 rm -rf ${WORK_DIR}/tars
 
 echo "Running VAD on shard ${SHARD}"
