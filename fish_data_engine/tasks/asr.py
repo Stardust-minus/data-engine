@@ -105,6 +105,9 @@ class ASR(Task):
             segment = raw_audio[:, start:end]
             sf.write(output_path / f"{idx:06d}.mp3", segment[0].cpu().numpy(), raw_sr)
 
+            with open(output_path / f"{idx:06d}.txt", "w") as f:
+                f.write(s["text"])
+
         with open(output_path / "asr.json", "w") as f:
             json.dump(asr_result, f, ensure_ascii=False)
 
