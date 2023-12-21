@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-SHARD="00000000"
+SHARD="00000001"
 SHARD_PREFIX=${SHARD:0:5}
 LANGUAGE="zh"
 WORLD_SIZE=2 # number of GPUs
@@ -13,7 +13,7 @@ rm -rf ${WORK_DIR}
 
 echo "Downloading shard ${SHARD}"
 mkdir -p ${WORK_DIR}/tars
-huggingface-cli download fishaudio/playerfm audios/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --local-dir ${WORK_DIR}/tars/ --repo-type dataset
+huggingface-cli download fish-audio-private/playerfm audios/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --local-dir ${WORK_DIR}/tars/ --repo-type dataset
 mkdir -p ${WORK_DIR}/audios
 
 echo "Extracting shard ${SHARD}"
@@ -32,7 +32,7 @@ echo "Build tarball for shard ${SHARD}"
 tar -cf ${WORK_DIR}/upload.tar -C ${WORK_DIR}/results/ .
 
 echo "Uploading shard ${SHARD}"
-huggingface-cli upload fishaudio/playerfm ${WORK_DIR}/upload.tar asr/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --repo-type dataset
+huggingface-cli upload fish-audio-private/playerfm ${WORK_DIR}/upload.tar asr/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --repo-type dataset
 
 echo "Cleaning up working directory"
 rm -rf ${WORK_DIR}
