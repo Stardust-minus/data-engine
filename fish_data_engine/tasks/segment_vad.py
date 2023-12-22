@@ -79,6 +79,8 @@ class SegmentVAD(Task):
             audio, sr = self.apply_demucs(audio, sr)
             torch.cuda.empty_cache()
 
+            raw_audio = torch.functional.resample(audio, orig_freq=sr, new_freq=raw_sr)
+
         # Sample to 16kHz
         audio, sr = (
             torchaudio.functional.resample(audio, orig_freq=sr, new_freq=16000),
