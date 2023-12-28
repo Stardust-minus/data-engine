@@ -1,12 +1,15 @@
 #!/bin/bash
 set -e
 
-SHARD="00000001"
+SHARD="00000007"
 SHARD_PREFIX=${SHARD:0:5}
 LANGUAGE="zh"
 WORLD_SIZE=2 # number of GPUs
 USE_DEBUG="--debug"
 WORK_DIR="/tmp/fish-speech"
+
+export WORLD_SIZE=${WORLD_SIZE}
+echo "WORLD_SIZE=${WORLD_SIZE}"
 
 echo "Cleaning up working directory"
 rm -rf ${WORK_DIR}
