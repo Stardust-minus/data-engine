@@ -32,7 +32,7 @@ python fish_data_engine/tasks/asr.py --input-dir ${WORK_DIR}/vads/ --output-dir 
 rm -rf ${WORK_DIR}/vads
 
 echo "Build tarball for shard ${SHARD}"
-tar -cvf - ${WORK_DIR}/results/ | pigz > ${WORK_DIR}/upload.tar
+tar -cf - ${WORK_DIR}/results/ | pigz > ${WORK_DIR}/upload.tar
 
 echo "Uploading shard ${SHARD}"
 huggingface-cli upload fish-audio-private/playerfm ${WORK_DIR}/upload.tar asr/${SHARD_PREFIX}/${LANGUAGE}/${SHARD}.tar --repo-type dataset
